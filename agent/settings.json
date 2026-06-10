@@ -1,0 +1,9 @@
+{
+  "defaultModel": "claude-sonnet-4-6",
+  "defaultProvider": "anthropic",
+  "packages": [
+    "npm:@ollama/pi-web-search"
+  ],
+  "lastChangelogVersion": "0.73.1",
+  "defaultThinkingLevel": "low"
+}
