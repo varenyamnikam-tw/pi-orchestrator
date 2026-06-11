@@ -2,6 +2,12 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { setupInterceptor, createState, type OrchestratorState } from "./interceptor.js";
 import { getWorkerContextBudget, invalidateBudgetCache } from "./summarizer.js";
 import * as cache from "./cache.js";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const promptTemplate = readFileSync(join(__dirname, "prompts", "orchestrator.prompt.md"), "utf8");
 
 const STATUS_KEY = "orchestrator";
 
@@ -19,59 +25,7 @@ export default function (pi: ExtensionAPI) {
   // Inject orchestrator guidance into the system prompt on every agent turn when enabled
   pi.on("before_agent_start", (event, _ctx) => {
     if (!state.enabled) return;
-    const guidance = `
-
-## Orchestrator Mode (ACTIVE)
-
-You have \`worker_delegate\` — a local worker LLM (${state.workerConfig.model}) that reads source files and answers factual questions. Use it as your **primary tool for understanding code**.
-
-### How to ask the worker (critical)
-
-Ask ONE focused factual question per call. The worker answers facts precisely but cannot reproduce code verbatim — never ask for "complete implementation", "exact code", "code snippets", or "detailed explanation with examples".
-
-**Good — narrow, factual, one thing at a time:**
-- "What condition in PlanService.submitPlan checks if the parent policy is inflight?"
-- "What fields does PlanService.submitPlan set when the parent is inflight?"
-- "What BPM method does PlanService.submitPlan call and what arguments does it pass?"
-- "What exception does PlanService.submitPlan throw if the parent is not found?"
-- "What does AuthService.validateToken return and what does it throw?"
-
-**Bad — too broad, asks for code, multi-part:**
-- "Show me the complete implementation of submitPlan" ← use read instead
-- "Be very detailed and include code snippets" ← never say this
-- "What checks does it do, what fields does it set, how does it call BPM, what does it store?" ← split into 4 calls
-
-### Decompose before you delegate
-If you need to understand 3 things about a method, make 3 separate \`worker_delegate\` calls, each with one precise question.
-
-### Never grep your way to understanding — ask the question directly
-Do NOT use \`bash grep\`, \`bash find\`, or \`bash cat\` to explore source code. Grep fragments your context with disconnected snippets and takes 10–40 calls to answer what one worker_delegate call answers in full.
-
-**Anti-pattern (what NOT to do):**
-\`\`\`
-bash: grep -rn "partnerName" src/          → 8 disconnected lines
-bash: grep -n "clonePolicy" ...            → 1 line
-bash: grep -rn "PartnerClient" ...         → 5 lines
-bash: grep -n "getGaPartnerName" ...       → 3 lines
-... 36 more greps
-\`\`\`
-
-**Replace the entire grep chain with one worker_delegate call:**
-\`\`\`
-worker_delegate(
-  "In ClonePolicyService.clonePolicy, where does partnerName come from
-   in the response — which object carries it and what method sets it?",
-  ["ClonePolicyService.java", "PolicyResponseBuilder.java"]
-)
-→ full precise answer, no fragmented context
-\`\`\`
-
-Use \`bash\` only for things the worker cannot do: running tests, building, checking git status, listing which files exist.
-
-### When to use read instead
-- You need verbatim file content to make an edit → \`read\` immediately before \`edit\`
-- The file is config/SQL/small (<50 lines) → \`read\`
-`;
+    const guidance = "\n" + promptTemplate.replace("{{workerModel}}", state.workerConfig.model);
     return { systemPrompt: (event as any).systemPrompt + guidance };
   });
 
