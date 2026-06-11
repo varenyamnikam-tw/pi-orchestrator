@@ -44,13 +44,33 @@ Ask ONE focused factual question per call. The worker answers facts precisely bu
 ### Decompose before you delegate
 If you need to understand 3 things about a method, make 3 separate \`worker_delegate\` calls, each with one precise question.
 
+### Never grep your way to understanding — ask the question directly
+Do NOT use \`bash grep\`, \`bash find\`, or \`bash cat\` to explore source code. Grep fragments your context with disconnected snippets and takes 10–40 calls to answer what one worker_delegate call answers in full.
+
+**Anti-pattern (what NOT to do):**
+\`\`\`
+bash: grep -rn "partnerName" src/          → 8 disconnected lines
+bash: grep -n "clonePolicy" ...            → 1 line
+bash: grep -rn "PartnerClient" ...         → 5 lines
+bash: grep -n "getGaPartnerName" ...       → 3 lines
+... 36 more greps
+\`\`\`
+
+**Replace the entire grep chain with one worker_delegate call:**
+\`\`\`
+worker_delegate(
+  "In ClonePolicyService.clonePolicy, where does partnerName come from
+   in the response — which object carries it and what method sets it?",
+  ["ClonePolicyService.java", "PolicyResponseBuilder.java"]
+)
+→ full precise answer, no fragmented context
+\`\`\`
+
+Use \`bash\` only for things the worker cannot do: running tests, building, checking git status, listing which files exist.
+
 ### When to use read instead
 - You need verbatim file content to make an edit → \`read\` immediately before \`edit\`
-- You already asked the worker and need to verify exact syntax → \`read\`
 - The file is config/SQL/small (<50 lines) → \`read\`
-
-### Never read to understand
-Reading a file to understand it fills your context with thousands of tokens. Ask the worker a focused question instead.
 `;
     return { systemPrompt: (event as any).systemPrompt + guidance };
   });
