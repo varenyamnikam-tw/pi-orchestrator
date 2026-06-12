@@ -24,7 +24,7 @@ export interface OrchestratorState {
   interceptedCount: number;
   savedBytesEstimate: number;
   goalContext: string | undefined;
-  lastAssistantMessage: string | undefined; // Sonnet's most recent reasoning text
+  lastAssistantMessage: string | undefined;
   workerStatus: "online" | "offline" | "missing" | "timeout";
   workerConfig: WorkerConfig;
   debugLog: DebugEntry[];

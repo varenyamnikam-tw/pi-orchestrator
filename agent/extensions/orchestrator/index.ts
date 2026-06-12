@@ -22,6 +22,11 @@ export default function (pi: ExtensionAPI) {
   state = createState({ model: DEFAULT_WORKER_MODEL, baseUrl: DEFAULT_WORKER_BASE_URL });
   setupInterceptor(pi, state);
 
+  // Keep edit review status current across sessions
+  pi.on("agent_start", (_event: any, ctx: any) => {
+    updateEditModeStatus(ctx);
+  });
+
   // Inject orchestrator guidance into the system prompt on every agent turn when enabled
   pi.on("before_agent_start", (event, _ctx) => {
     if (!state.enabled) return;
@@ -78,6 +83,7 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.notify(
           [
             `Orchestrator: ${state.enabled ? "ON" : "OFF"}`,
+            `Edit mode: ${state.autoAccept ? "auto-accept" : "review (Ctrl+Shift+A to toggle)"}`,
             `Worker model: ${state.workerConfig.model} @ ${state.workerConfig.baseUrl}`,
             `Worker context budget: ~${budgetKB}`,
             `Worker status: ${state.workerStatus}`,
@@ -180,7 +186,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // Ctrl+Shift+O: quick toggle
+  // Ctrl+Shift+O: quick toggle orchestrator on/off
   pi.registerShortcut("ctrl+shift+o", {
     description: "Toggle orchestrator mode",
     handler: async (ctx) => {
@@ -191,6 +197,11 @@ export default function (pi: ExtensionAPI) {
       }
     },
   });
+
+}
+
+function updateEditModeStatus(ctx: any) {
+  if (state.enabled) ctx.ui.setStatus(STATUS_KEY, "brain [on]");
 }
 
 async function enableOrchestrator(ctx: any) {
@@ -201,7 +212,7 @@ async function enableOrchestrator(ctx: any) {
   state.workerStatus = "online";
   // Sync worker config to shared globalThis so worker_delegate uses the same model
   (globalThis as any).__piWorkerConfig = { ...state.workerConfig };
-  ctx.ui.setStatus(STATUS_KEY, "brain [on]");
+  updateEditModeStatus(ctx);
 
   // Probe worker model availability and report context window
   getWorkerContextBudget(state.workerConfig).then((budget) => {
